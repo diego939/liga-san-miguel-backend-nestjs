@@ -1,0 +1,147 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EstadoPartido, TipoEvento } from '@prisma/client';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+
+export class CreatePartidoDto {
+  @ApiProperty()
+  @IsInt()
+  equipoLocalId: number;
+
+  @ApiProperty()
+  @IsInt()
+  equipoVisitanteId: number;
+
+  @ApiProperty()
+  @IsDateString()
+  fecha: string;
+}
+
+export class UpdatePartidoDto {
+  @ApiPropertyOptional()
+  @IsDateString()
+  fecha?: string;
+
+  @ApiPropertyOptional()
+  @IsInt()
+  equipoLocalId?: number;
+
+  @ApiPropertyOptional()
+  @IsInt()
+  equipoVisitanteId?: number;
+}
+
+export class UpdateEstadoPartidoDto {
+  @ApiProperty({ enum: EstadoPartido })
+  @IsEnum(EstadoPartido)
+  estado: EstadoPartido;
+}
+
+export class UpdateMarcadorDto {
+  @ApiProperty()
+  @IsInt()
+  @Min(0)
+  golesLocal: number;
+
+  @ApiProperty()
+  @IsInt()
+  @Min(0)
+  golesVisitante: number;
+}
+
+export class PlanillaLineaDto {
+  @ApiProperty()
+  @IsInt()
+  jugadorId: number;
+
+  @ApiProperty()
+  @IsBoolean()
+  titular: boolean;
+}
+
+export class ReemplazarPlanillaDto {
+  @ApiProperty({ type: [PlanillaLineaDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PlanillaLineaDto)
+  local: PlanillaLineaDto[];
+
+  @ApiProperty({ type: [PlanillaLineaDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PlanillaLineaDto)
+  visitante: PlanillaLineaDto[];
+}
+
+export class CreateEventoPartidoDto {
+  @ApiProperty()
+  @IsInt()
+  jugadorId: number;
+
+  @ApiProperty({ enum: TipoEvento })
+  @IsEnum(TipoEvento)
+  tipo: TipoEvento;
+
+  @ApiProperty()
+  @IsInt()
+  @Min(0)
+  minuto: number;
+}
+
+export class CreateCambioDto {
+  @ApiProperty()
+  @IsInt()
+  jugadorSaleId: number;
+
+  @ApiProperty()
+  @IsInt()
+  jugadorEntraId: number;
+
+  @ApiProperty()
+  @IsInt()
+  @Min(0)
+  minuto: number;
+}
+
+export class PartidoTorneoQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ enum: EstadoPartido })
+  @IsOptional()
+  @IsEnum(EstadoPartido)
+  estado?: EstadoPartido;
+
+  @ApiPropertyOptional({
+    description: 'Buscar por nombre de club (local o visitante)',
+  })
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @ApiPropertyOptional({ enum: ['fecha', 'estado', 'id'], default: 'fecha' })
+  @IsOptional()
+  @IsIn(['fecha', 'estado', 'id'])
+  sortBy?: 'fecha' | 'estado' | 'id' = 'fecha';
+}
+
+export class PreviewPlanillaQueryDto {
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  jugadorId: number;
+
+  @ApiProperty({ description: 'Equipo (local o visitante) donde se alinearía' })
+  @Type(() => Number)
+  @IsInt()
+  equipoTorneoId: number;
+}

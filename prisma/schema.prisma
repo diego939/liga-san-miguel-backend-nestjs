@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//////////////////////////////////////////////////////
+// ENUMS
+//////////////////////////////////////////////////////
+
+enum TipoPase {
+  TEMPORAL
+  DEFINITIVO
+}
+
+enum TipoEvento {
+  GOL
+  AMARILLA
+  ROJA
+}
+
+enum EstadoPartido {
+  PENDIENTE
+  EN_JUEGO
+  FINALIZADO
+}
+
+//////////////////////////////////////////////////////
+// USUARIOS Y ROLES
+//////////////////////////////////////////////////////
+
+model Rol {
+  id          Int       @id @default(autoincrement())
+  descripcion String
+
+  usuarios Usuario[]
+}
+
+model Usuario {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String
+  rolId    Int
+
+  rol Rol @relation(fields: [rolId], references: [id])
+}
+
+//////////////////////////////////////////////////////
+// JUGADORES
+//////////////////////////////////////////////////////
+
+model Jugador {
+  id              Int      @id @default(autoincrement())
+  dni             String   @unique
+  nombre          String
+  apellido        String
+  telefono        String?
+  fechaNacimiento DateTime
+  createdAt       DateTime @default(now())
+
+  pases            Pase[]
+  inscripciones    Inscripcion[]
+  eventos          EventoPartido[]
+  suspensiones     Suspension[]
+  partidoJugadores PartidoJugador[]
+}
+
+//////////////////////////////////////////////////////
+// CLUBES
+//////////////////////////////////////////////////////
+
+model Club {
+  id       Int     @id @default(autoincrement())
+  nombre   String
+  logo     String?
+
+  personal       ClubPersonal[]
+  equipos        EquipoTorneo[]
+  pasesOrigen    Pase[]         @relation("PaseOrigen")
+  pasesDestino   Pase[]         @relation("PaseDestino")
+}
+
+model ClubPersonal {
+  id       Int     @id @default(autoincrement())
+  clubId   Int
+  tipo     String
+  nombre   String
+  dni      String?
+  telefono String?
+
+  club Club @relation(fields: [clubId], references: [id])
+}
+
+//////////////////////////////////////////////////////
+// PASES
+//////////////////////////////////////////////////////
+
+model Pase {
+  id            Int       @id @default(autoincrement())
+  jugadorId     Int
+  /// Null en altas iniciales (primer club del jugador, sin club previo).
+  clubOrigenId  Int?
+  clubDestinoId Int
+  tipo          TipoPase
+  fechaInicio   DateTime
+  fechaFin      DateTime?
+
+  jugador     Jugador @relation(fields: [jugadorId], references: [id])
+  clubOrigen  Club?   @relation("PaseOrigen", fields: [clubOrigenId], references: [id])
+  clubDestino Club    @relation("PaseDestino", fields: [clubDestinoId], references: [id])
+}
+
+//////////////////////////////////////////////////////
+// TORNEOS
+//////////////////////////////////////////////////////
+
+model Torneo {
+  id             Int       @id @default(autoincrement())
+  nombre         String
+  categoria      String
+  formato        String
+  fechaInicio    DateTime
+  fechaFin       DateTime
+  limiteForaneos Int?
+  maxJugadores   Int
+
+  equipos      EquipoTorneo[]
+  partidos     Partido[]
+  suspensiones Suspension[]
+}
+
+//////////////////////////////////////////////////////
+// EQUIPOS EN TORNEO
+//////////////////////////////////////////////////////
+
+model EquipoTorneo {
+  id       Int @id @default(autoincrement())
+  torneoId Int
+  clubId   Int
+
+  torneo Torneo @relation(fields: [torneoId], references: [id])
+  club   Club   @relation(fields: [clubId], references: [id])
+
+  inscripciones       Inscripcion[]
+  partidosLocal       Partido[]         @relation("Local")
+  partidosVisitante   Partido[]         @relation("Visitante")
+  partidoJugadores    PartidoJugador[]
+}
+
+//////////////////////////////////////////////////////
+// INSCRIPCIONES (LISTA DE BUENA FE)
+//////////////////////////////////////////////////////
+
+model Inscripcion {
+  id             Int       @id @default(autoincrement())
+  jugadorId      Int
+  equipoTorneoId Int
+  esForaneo      Boolean
+  fechaInicio    DateTime  @default(now())
+  fechaFin       DateTime?
+
+  jugador      Jugador      @relation(fields: [jugadorId], references: [id])
+  equipoTorneo EquipoTorneo @relation(fields: [equipoTorneoId], references: [id])
+}
+
+//////////////////////////////////////////////////////
+// PARTIDOS
+//////////////////////////////////////////////////////
+
+model Partido {
+  id                Int           @id @default(autoincrement())
+  torneoId          Int
+  equipoLocalId     Int
+  equipoVisitanteId Int
+  fecha             DateTime
+  golesLocal        Int           @default(0)
+  golesVisitante    Int           @default(0)
+  estado            EstadoPartido @default(PENDIENTE)
+
+  torneo          Torneo       @relation(fields: [torneoId], references: [id])
+  equipoLocal     EquipoTorneo @relation("Local", fields: [equipoLocalId], references: [id])
+  equipoVisitante EquipoTorneo @relation("Visitante", fields: [equipoVisitanteId], references: [id])
+
+  jugadores PartidoJugador[]
+  eventos   EventoPartido[]
+  cambios   Cambio[]
+}
+
+//////////////////////////////////////////////////////
+// JUGADORES EN PARTIDO
+//////////////////////////////////////////////////////
+
+model PartidoJugador {
+  id        Int     @id @default(autoincrement())
+  partidoId Int
+  jugadorId Int
+  equipoId  Int
+  titular   Boolean
+
+  partido Partido      @relation(fields: [partidoId], references: [id])
+  jugador Jugador      @relation(fields: [jugadorId], references: [id])
+  equipo  EquipoTorneo @relation(fields: [equipoId], references: [id])
+}
+
+//////////////////////////////////////////////////////
+// EVENTOS (GOLES, TARJETAS)
+//////////////////////////////////////////////////////
+
+model EventoPartido {
+  id        Int        @id @default(autoincrement())
+  partidoId Int
+  jugadorId Int
+  tipo      TipoEvento
+  minuto    Int
+
+  partido Partido @relation(fields: [partidoId], references: [id])
+  jugador Jugador @relation(fields: [jugadorId], references: [id])
+}
+
+//////////////////////////////////////////////////////
+// CAMBIOS
+//////////////////////////////////////////////////////
+
+model Cambio {
+  id             Int @id @default(autoincrement())
+  partidoId      Int
+  jugadorSaleId  Int
+  jugadorEntraId Int
+  minuto         Int
+
+  partido Partido @relation(fields: [partidoId], references: [id])
+}
+
+//////////////////////////////////////////////////////
+// SUSPENSIONES
+//////////////////////////////////////////////////////
+
+model Suspension {
+  id                Int    @id @default(autoincrement())
+  jugadorId         Int
+  torneoId          Int
+  motivo            String
+  partidosRestantes Int
+
+  jugador Jugador @relation(fields: [jugadorId], references: [id])
+  torneo  Torneo  @relation(fields: [torneoId], references: [id])
+}
