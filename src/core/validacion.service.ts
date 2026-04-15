@@ -4,7 +4,37 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EstadoPartido, Pase, Prisma, TipoEvento, TipoPase } from '@prisma/client';
+import {
+  parseEstadoPartido,
+  queryPartidoScalarsById,
+} from '../partidos/partido-scalar.raw';
 import { PrismaService } from '../prisma/prisma.service';
+
+/**
+ * Día civil en UTC de `fecha` (inicio 00:00 y fin 23:59:59.999).
+ * Evita que una inscripción/pase iniciado el mismo día pero después de medianoche
+ * falle frente a `partido.fecha` guardada como 00:00 UTC.
+ */
+function rangoDiaUtc(fecha: Date): { inicio: Date; fin: Date } {
+  const y = fecha.getUTCFullYear();
+  const m = fecha.getUTCMonth();
+  const d = fecha.getUTCDate();
+  return {
+    inicio: new Date(Date.UTC(y, m, d, 0, 0, 0, 0)),
+    fin: new Date(Date.UTC(y, m, d, 23, 59, 59, 999)),
+  };
+}
+
+/** Inscripción o pase con vigencia que solapa el día UTC de `fechaReferencia`. */
+function whereVigenteEnDiaDe(
+  fechaReferencia: Date,
+): { fechaInicio: { lte: Date }; OR: ({ fechaFin: null } | { fechaFin: { gt: Date } })[] } {
+  const { inicio, fin } = rangoDiaUtc(fechaReferencia);
+  return {
+    fechaInicio: { lte: fin },
+    OR: [{ fechaFin: null }, { fechaFin: { gt: inicio } }],
+  };
+}
 
 /** Reglas de negocio RN-01 … RN-12 (validación en tiempo real). */
 @Injectable()
@@ -45,8 +75,7 @@ export class ValidacionService {
   }
 
   /**
-   * Devuelve los ids de jugadores (de `candidatos`) cuyo club elegible coincide con `clubId`.
-   * Carga los pases en una sola consulta.
+   * Jugadores con **pase activo** en `at` cuyo **destino** es `clubId`.
    */
   async filtrarJugadoresElegiblesParaClub(
     candidatos: number[],
@@ -55,23 +84,16 @@ export class ValidacionService {
   ): Promise<number[]> {
     if (candidatos.length === 0) return [];
     const uniq = [...new Set(candidatos)];
-    const allPases = await this.prisma.pase.findMany({
-      where: { jugadorId: { in: uniq } },
-      orderBy: { fechaInicio: 'desc' },
+    const vigente = whereVigenteEnDiaDe(at);
+    const activos = await this.prisma.pase.findMany({
+      where: {
+        jugadorId: { in: uniq },
+        clubDestinoId: clubId,
+        ...vigente,
+      },
+      select: { jugadorId: true },
     });
-    const byJug = new Map<number, typeof allPases>();
-    for (const p of allPases) {
-      const arr = byJug.get(p.jugadorId) ?? [];
-      arr.push(p);
-      byJug.set(p.jugadorId, arr);
-    }
-    const elegibles: number[] = [];
-    for (const id of uniq) {
-      const pases = byJug.get(id) ?? [];
-      const cid = this.clubElegibleDesdeHistorialPases(pases, at);
-      if (cid === clubId) elegibles.push(id);
-    }
-    return elegibles;
+    return [...new Set(activos.map((p) => p.jugadorId))];
   }
 
   /**
@@ -102,7 +124,25 @@ export class ValidacionService {
   }
 
   /**
-   * RN-05 + RN-12: alta en lista de buena fe (solo pase + club; no exige inscripción previa).
+   * Existe **pase activo** en `at` con destino al club indicado (`clubDestinoId`).
+   */
+  async tienePaseActivoHaciaClub(
+    jugadorId: number,
+    clubDestinoId: number,
+    at: Date,
+  ): Promise<boolean> {
+    const row = await this.prisma.pase.findFirst({
+      where: {
+        jugadorId,
+        clubDestinoId,
+        ...whereVigenteEnDiaDe(at),
+      },
+    });
+    return row !== null;
+  }
+
+  /**
+   * RN-03 + RN-05 + RN-12: alta en lista de buena fe — pase activo con destino al **club** del equipo.
    */
   async assertPuedeAltaInscripcion(
     jugadorId: number,
@@ -122,70 +162,28 @@ export class ValidacionService {
     if (!jugador) {
       throw new NotFoundException('Jugador no encontrado');
     }
-    const clubElegible = await this.getClubElegibleId(
+    const ok = await this.tienePaseActivoHaciaClub(
       jugadorId,
+      equipo.clubId,
       fechaReferencia,
     );
-    if (clubElegible !== equipo.clubId) {
+    if (!ok) {
       throw new BadRequestException(
-        'RN-03 / RN-05: el jugador no tiene pase activo vigente hacia el club de este equipo.',
+        'RN-03 / RN-05: el jugador no tiene pase activo con destino al club de este equipo en la fecha de referencia.',
       );
     }
   }
 
   /**
-   * RN-05 + RN-12: inscripción activa y pase al club del equipo.
-   */
-  async assertInscripcionPermitida(
-    jugadorId: number,
-    equipoTorneoId: number,
-    fechaReferencia: Date = new Date(),
-  ): Promise<void> {
-    const equipo = await this.prisma.equipoTorneo.findUnique({
-      where: { id: equipoTorneoId },
-      include: { club: true },
-    });
-    if (!equipo) {
-      throw new NotFoundException('Equipo en torneo no encontrado');
-    }
-
-    const inscripcion = await this.prisma.inscripcion.findFirst({
-      where: {
-        jugadorId,
-        equipoTorneoId,
-        fechaInicio: { lte: fechaReferencia },
-        OR: [{ fechaFin: null }, { fechaFin: { gt: fechaReferencia } }],
-      },
-    });
-    if (!inscripcion) {
-      throw new BadRequestException(
-        'RN-05 / RN-06: el jugador no tiene inscripción activa en este equipo (lista de buena fe).',
-      );
-    }
-
-    const clubElegible = await this.getClubElegibleId(
-      jugadorId,
-      fechaReferencia,
-    );
-    if (clubElegible !== equipo.clubId) {
-      throw new BadRequestException(
-        'RN-03 / RN-05: el jugador no tiene pase activo vigente hacia el club de este equipo en la fecha de referencia.',
-      );
-    }
-  }
-
-  /**
-   * RN-06, RN-07, RN-12: valida un jugador en planilla de partido.
+   * Elegibilidad para jugar (planilla): inscripción activa en el equipo del torneo,
+   * pase activo con destino al club del equipo, no suspendido en el torneo.
    */
   async assertJugadorPuedeJugarEnPlanilla(
     partidoId: number,
     jugadorId: number,
     equipoTorneoId: number,
   ): Promise<{ esForaneo: boolean }> {
-    const partido = await this.prisma.partido.findUnique({
-      where: { id: partidoId },
-      include: { torneo: true },
-    });
+    const partido = await queryPartidoScalarsById(this.prisma, partidoId);
     if (!partido) {
       throw new NotFoundException('Partido no encontrado');
     }
@@ -198,22 +196,41 @@ export class ValidacionService {
       );
     }
 
-    await this.assertInscripcionPermitida(
-      jugadorId,
-      equipoTorneoId,
-      partido.fecha,
-    );
+    const equipo = await this.prisma.equipoTorneo.findUnique({
+      where: { id: equipoTorneoId },
+      include: { club: true },
+    });
+    if (!equipo) {
+      throw new NotFoundException('Equipo en torneo no encontrado');
+    }
+    if (equipo.torneoId !== partido.torneoId) {
+      throw new BadRequestException(
+        'El equipo no pertenece al torneo de este partido.',
+      );
+    }
 
     const inscripcion = await this.prisma.inscripcion.findFirst({
       where: {
         jugadorId,
         equipoTorneoId,
-        fechaInicio: { lte: partido.fecha },
-        OR: [{ fechaFin: null }, { fechaFin: { gt: partido.fecha } }],
+        ...whereVigenteEnDiaDe(partido.fecha),
       },
     });
     if (!inscripcion) {
-      throw new BadRequestException('Inscripción no encontrada.');
+      throw new BadRequestException(
+        'RN-05 / RN-06: el jugador no está inscripto en este equipo en el torneo para la fecha del partido.',
+      );
+    }
+
+    const okPase = await this.tienePaseActivoHaciaClub(
+      jugadorId,
+      equipo.clubId,
+      partido.fecha,
+    );
+    if (!okPase) {
+      throw new BadRequestException(
+        'RN-03 / RN-05: el jugador no tiene pase activo con destino al club de este equipo en la fecha del partido.',
+      );
     }
 
     const suspendido = await this.prisma.suspension.findFirst({
@@ -317,10 +334,8 @@ export class ValidacionService {
    * que estaban inscriptos en alguno de los dos equipos y no figuraron en la planilla.
    */
   async consumirSuspensionesTrasFinalizar(partidoId: number): Promise<void> {
-    const partido = await this.prisma.partido.findUnique({
-      where: { id: partidoId },
-    });
-    if (!partido || partido.estado !== EstadoPartido.FINALIZADO) {
+    const partido = await queryPartidoScalarsById(this.prisma, partidoId);
+    if (!partido || parseEstadoPartido(partido.estado) !== EstadoPartido.FINALIZADO) {
       return;
     }
 

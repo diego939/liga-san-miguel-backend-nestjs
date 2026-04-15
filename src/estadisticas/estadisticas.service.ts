@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoPartido, TipoEvento } from '@prisma/client';
+import { EstadoPartido, Prisma, TipoEvento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type Row = {
@@ -49,6 +49,12 @@ export class EstadisticasService {
 
     const partidos = await this.prisma.partido.findMany({
       where: { torneoId, estado: EstadoPartido.FINALIZADO },
+      select: {
+        equipoLocalId: true,
+        equipoVisitanteId: true,
+        golesLocal: true,
+        golesVisitante: true,
+      } satisfies Prisma.PartidoSelect,
     });
 
     for (const p of partidos) {

@@ -10,6 +10,8 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -69,6 +71,16 @@ export class PlanillaLineaDto {
   @ApiProperty()
   @IsBoolean()
   titular: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Número de camiseta en la planilla del partido',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(999)
+  numeroCamiseta?: number | null;
 }
 
 export class ReemplazarPlanillaDto {
@@ -83,6 +95,42 @@ export class ReemplazarPlanillaDto {
   @ValidateNested({ each: true })
   @Type(() => PlanillaLineaDto)
   visitante: PlanillaLineaDto[];
+
+  @ApiPropertyOptional({ nullable: true, description: 'Debe estar en planilla local' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  capitanLocalJugadorId?: number | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Debe estar en planilla visitante' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  capitanVisitanteJugadorId?: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  arbitroPrincipal?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  juezLinea1?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  juezLinea2?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(8000)
+  observaciones?: string | null;
 }
 
 export class CreateEventoPartidoDto {
@@ -98,6 +146,12 @@ export class CreateEventoPartidoDto {
   @IsInt()
   @Min(0)
   minuto: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notas?: string | null;
 }
 
 export class CreateCambioDto {

@@ -18,6 +18,8 @@ enum TipoPase {
 
 enum TipoEvento {
   GOL
+  /// Autogol atribuido al jugador (planilla / estadísticas según reglamento).
+  GOL_EN_CONTRA
   AMARILLA
   ROJA
 }
@@ -61,11 +63,15 @@ model Jugador {
   fechaNacimiento DateTime
   createdAt       DateTime @default(now())
 
-  pases            Pase[]
-  inscripciones    Inscripcion[]
-  eventos          EventoPartido[]
-  suspensiones     Suspension[]
-  partidoJugadores PartidoJugador[]
+  pases                      Pase[]
+  inscripciones              Inscripcion[]
+  eventos                    EventoPartido[]
+  suspensiones               Suspension[]
+  partidoJugadores           PartidoJugador[]
+  partidosCapitanLocal       Partido[] @relation("CapitanLocal")
+  partidosCapitanVisitante   Partido[] @relation("CapitanVisitante")
+  cambiosComoSale            Cambio[] @relation("CambioSale")
+  cambiosComoEntra           Cambio[] @relation("CambioEntra")
 }
 
 //////////////////////////////////////////////////////
@@ -180,9 +186,20 @@ model Partido {
   golesVisitante    Int           @default(0)
   estado            EstadoPartido @default(PENDIENTE)
 
+  /// Capitán designado (debe figurar en la planilla local al guardar).
+  capitanLocalJugadorId Int?
+  /// Capitán designado (debe figurar en la planilla visitante al guardar).
+  capitanVisitanteJugadorId Int?
+  arbitroPrincipal          String?
+  juezLinea1                String?
+  juezLinea2                String?
+  observaciones             String?
+
   torneo          Torneo       @relation(fields: [torneoId], references: [id])
   equipoLocal     EquipoTorneo @relation("Local", fields: [equipoLocalId], references: [id])
   equipoVisitante EquipoTorneo @relation("Visitante", fields: [equipoVisitanteId], references: [id])
+  capitanLocalJugador     Jugador? @relation("CapitanLocal", fields: [capitanLocalJugadorId], references: [id], onDelete: SetNull)
+  capitanVisitanteJugador Jugador? @relation("CapitanVisitante", fields: [capitanVisitanteJugadorId], references: [id], onDelete: SetNull)
 
   jugadores PartidoJugador[]
   eventos   EventoPartido[]
@@ -199,6 +216,8 @@ model PartidoJugador {
   jugadorId Int
   equipoId  Int
   titular   Boolean
+  /// Número de camiseta en este partido (planilla impresa).
+  numeroCamiseta Int?
 
   partido Partido      @relation(fields: [partidoId], references: [id])
   jugador Jugador      @relation(fields: [jugadorId], references: [id])
@@ -215,6 +234,7 @@ model EventoPartido {
   jugadorId Int
   tipo      TipoEvento
   minuto    Int
+  notas     String?
 
   partido Partido @relation(fields: [partidoId], references: [id])
   jugador Jugador @relation(fields: [jugadorId], references: [id])
@@ -231,7 +251,9 @@ model Cambio {
   jugadorEntraId Int
   minuto         Int
 
-  partido Partido @relation(fields: [partidoId], references: [id])
+  partido      Partido @relation(fields: [partidoId], references: [id])
+  jugadorSale  Jugador @relation("CambioSale", fields: [jugadorSaleId], references: [id])
+  jugadorEntra Jugador @relation("CambioEntra", fields: [jugadorEntraId], references: [id])
 }
 
 //////////////////////////////////////////////////////
