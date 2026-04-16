@@ -3,43 +3,56 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EstadoPartido, Pase, Prisma, TipoEvento, TipoPase } from '@prisma/client';
+import { DateTime } from 'luxon';
 import {
   parseEstadoPartido,
   queryPartidoScalarsById,
 } from '../partidos/partido-scalar.raw';
 import { PrismaService } from '../prisma/prisma.service';
 
-/**
- * Día civil en UTC de `fecha` (inicio 00:00 y fin 23:59:59.999).
- * Evita que una inscripción/pase iniciado el mismo día pero después de medianoche
- * falle frente a `partido.fecha` guardada como 00:00 UTC.
- */
-function rangoDiaUtc(fecha: Date): { inicio: Date; fin: Date } {
-  const y = fecha.getUTCFullYear();
-  const m = fecha.getUTCMonth();
-  const d = fecha.getUTCDate();
-  return {
-    inicio: new Date(Date.UTC(y, m, d, 0, 0, 0, 0)),
-    fin: new Date(Date.UTC(y, m, d, 23, 59, 59, 999)),
-  };
-}
-
-/** Inscripción o pase con vigencia que solapa el día UTC de `fechaReferencia`. */
-function whereVigenteEnDiaDe(
-  fechaReferencia: Date,
-): { fechaInicio: { lte: Date }; OR: ({ fechaFin: null } | { fechaFin: { gt: Date } })[] } {
-  const { inicio, fin } = rangoDiaUtc(fechaReferencia);
-  return {
-    fechaInicio: { lte: fin },
-    OR: [{ fechaFin: null }, { fechaFin: { gt: inicio } }],
-  };
-}
-
 /** Reglas de negocio RN-01 … RN-12 (validación en tiempo real). */
 @Injectable()
 export class ValidacionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private get appTimeZone(): string {
+    return (
+      this.config.get<string>('APP_TIMEZONE') ??
+      'America/Argentina/Buenos_Aires'
+    );
+  }
+
+  /**
+   * Inicio y fin del día civil en `appTimeZone` que contiene el instante `fecha`
+   * (para solapes de inscripción / pase con la fecha del partido).
+   */
+  private rangoDiaCivil(fecha: Date): { inicio: Date; fin: Date } {
+    const local = DateTime.fromMillis(fecha.getTime(), {
+      zone: this.appTimeZone,
+    });
+    const start = local.startOf('day');
+    const end = local.endOf('day');
+    return { inicio: start.toJSDate(), fin: end.toJSDate() };
+  }
+
+  /** Inscripción o pase con vigencia que solapa el día civil de `fechaReferencia`. */
+  private whereVigenteEnDiaDe(
+    fechaReferencia: Date,
+  ): {
+    fechaInicio: { lte: Date };
+    OR: ({ fechaFin: null } | { fechaFin: { gt: Date } })[];
+  } {
+    const { inicio, fin } = this.rangoDiaCivil(fechaReferencia);
+    return {
+      fechaInicio: { lte: fin },
+      OR: [{ fechaFin: null }, { fechaFin: { gt: inicio } }],
+    };
+  }
 
   /**
    * Misma regla que getClubElegibleId, sin I/O.
@@ -75,7 +88,8 @@ export class ValidacionService {
   }
 
   /**
-   * Jugadores con **pase activo** en `at` cuyo **destino** es `clubId`.
+   * Jugadores cuyo **club elegible** en el instante `at` coincide con `clubId`
+   * (misma regla que `getClubElegibleId`, no basta un pase histórico al club que solape el día).
    */
   async filtrarJugadoresElegiblesParaClub(
     candidatos: number[],
@@ -84,16 +98,37 @@ export class ValidacionService {
   ): Promise<number[]> {
     if (candidatos.length === 0) return [];
     const uniq = [...new Set(candidatos)];
-    const vigente = whereVigenteEnDiaDe(at);
-    const activos = await this.prisma.pase.findMany({
-      where: {
-        jugadorId: { in: uniq },
-        clubDestinoId: clubId,
-        ...vigente,
+    type Row = Pick<
+      Pase,
+      'jugadorId' | 'tipo' | 'fechaInicio' | 'fechaFin' | 'clubDestinoId' | 'clubOrigenId'
+    >;
+    const rows = await this.prisma.pase.findMany({
+      where: { jugadorId: { in: uniq } },
+      orderBy: { fechaInicio: 'desc' },
+      select: {
+        jugadorId: true,
+        tipo: true,
+        fechaInicio: true,
+        fechaFin: true,
+        clubDestinoId: true,
+        clubOrigenId: true,
       },
-      select: { jugadorId: true },
     });
-    return [...new Set(activos.map((p) => p.jugadorId))];
+    const byJugador = new Map<number, Row[]>();
+    for (const r of rows) {
+      const arr = byJugador.get(r.jugadorId);
+      if (arr) arr.push(r);
+      else byJugador.set(r.jugadorId, [r]);
+    }
+    const out: number[] = [];
+    for (const id of uniq) {
+      const list = byJugador.get(id);
+      if (!list?.length) continue;
+      list.sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime());
+      const elegible = this.clubElegibleDesdeHistorialPases(list, at);
+      if (elegible === clubId) out.push(id);
+    }
+    return out;
   }
 
   /**
@@ -124,21 +159,16 @@ export class ValidacionService {
   }
 
   /**
-   * Existe **pase activo** en `at` con destino al club indicado (`clubDestinoId`).
+   * El jugador puede competir para el club `clubDestinoId` en el instante `at`
+   * (club devuelto por `getClubElegibleId`, no un pase antiguo al mismo club que aún solape el día civil).
    */
   async tienePaseActivoHaciaClub(
     jugadorId: number,
     clubDestinoId: number,
     at: Date,
   ): Promise<boolean> {
-    const row = await this.prisma.pase.findFirst({
-      where: {
-        jugadorId,
-        clubDestinoId,
-        ...whereVigenteEnDiaDe(at),
-      },
-    });
-    return row !== null;
+    const elegible = await this.getClubElegibleId(jugadorId, at);
+    return elegible === clubDestinoId;
   }
 
   /**
@@ -213,7 +243,7 @@ export class ValidacionService {
       where: {
         jugadorId,
         equipoTorneoId,
-        ...whereVigenteEnDiaDe(partido.fecha),
+        ...this.whereVigenteEnDiaDe(partido.fecha),
       },
     });
     if (!inscripcion) {

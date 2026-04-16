@@ -549,6 +549,115 @@ export class PartidosService {
     });
   }
 
+  private static readonly MOTIVO_SUSPENSION_ROJA = 'Tarjeta roja';
+  private static readonly MOTIVO_SUSPENSION_AMARILLAS =
+    'Acumulación de 5 tarjetas amarillas en el torneo';
+
+  async deleteEvento(partidoId: number, eventoId: number) {
+    const partido = await this.findOne(partidoId);
+    if (partido.estado !== EstadoPartido.EN_JUEGO) {
+      throw new BadRequestException(
+        'Solo se eliminan eventos con partido EN_JUEGO',
+      );
+    }
+    const ev = await this.prisma.eventoPartido.findFirst({
+      where: { id: eventoId, partidoId },
+      include: { partido: { select: { torneoId: true } } },
+    });
+    if (!ev) {
+      throw new NotFoundException('Evento no encontrado');
+    }
+    const torneoId = ev.partido.torneoId;
+    const { tipo, jugadorId } = ev;
+
+    let oldAmarillaCount = 0;
+    if (tipo === TipoEvento.AMARILLA) {
+      oldAmarillaCount = await this.prisma.eventoPartido.count({
+        where: {
+          tipo: TipoEvento.AMARILLA,
+          jugadorId,
+          partido: { torneoId },
+        },
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventoPartido.delete({ where: { id: eventoId } });
+
+      if (tipo === TipoEvento.ROJA) {
+        const susp = await tx.suspension.findFirst({
+          where: {
+            jugadorId,
+            torneoId,
+            motivo: PartidosService.MOTIVO_SUSPENSION_ROJA,
+          },
+          orderBy: { id: 'desc' },
+        });
+        if (susp) {
+          await tx.suspension.delete({ where: { id: susp.id } });
+        }
+      }
+
+      if (tipo === TipoEvento.AMARILLA) {
+        const newCount = oldAmarillaCount - 1;
+        if (
+          oldAmarillaCount > 0 &&
+          oldAmarillaCount % 5 === 0 &&
+          newCount % 5 !== 0
+        ) {
+          const susp = await tx.suspension.findFirst({
+            where: {
+              jugadorId,
+              torneoId,
+              motivo: PartidosService.MOTIVO_SUSPENSION_AMARILLAS,
+            },
+            orderBy: { id: 'desc' },
+          });
+          if (susp) {
+            await tx.suspension.delete({ where: { id: susp.id } });
+          }
+        }
+      }
+    });
+
+    if (
+      tipo === TipoEvento.GOL ||
+      tipo === TipoEvento.GOL_EN_CONTRA
+    ) {
+      const remaining = await this.prisma.eventoPartido.count({
+        where: {
+          partidoId,
+          tipo: { in: [TipoEvento.GOL, TipoEvento.GOL_EN_CONTRA] },
+        },
+      });
+      if (remaining === 0) {
+        await this.prisma.partido.update({
+          where: { id: partidoId },
+          data: { golesLocal: 0, golesVisitante: 0 },
+        });
+      } else {
+        await this.recalcularMarcadorDesdeEventos(partidoId);
+      }
+    }
+  }
+
+  async deleteCambio(partidoId: number, cambioId: number) {
+    const partido = await this.findOne(partidoId);
+    if (partido.estado !== EstadoPartido.EN_JUEGO) {
+      throw new BadRequestException(
+        'Solo se eliminan cambios con partido EN_JUEGO',
+      );
+    }
+    const row = await this.prisma.cambio.findFirst({
+      where: { id: cambioId, partidoId },
+      select: { id: true },
+    });
+    if (!row) {
+      throw new NotFoundException('Cambio no encontrado');
+    }
+    await this.prisma.cambio.delete({ where: { id: cambioId } });
+  }
+
   async addCambio(partidoId: number, dto: CreateCambioDto) {
     const partido = await this.findOne(partidoId);
     if (partido.estado !== EstadoPartido.EN_JUEGO) {

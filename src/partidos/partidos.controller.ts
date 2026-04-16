@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
   Patch,
@@ -101,6 +103,16 @@ export class PartidosResourceController {
     return this.partidosService.addEvento(id, dto);
   }
 
+  @Delete(':id/eventos/:eventoId')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Eliminar evento (solo partido EN_JUEGO)' })
+  deleteEvento(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('eventoId', ParseIntPipe) eventoId: number,
+  ) {
+    return this.partidosService.deleteEvento(id, eventoId);
+  }
+
   @Get(':id/cambios')
   @ApiOperation({ summary: 'Cambios del partido' })
   listCambios(@Param('id', ParseIntPipe) id: number) {
@@ -114,6 +126,16 @@ export class PartidosResourceController {
     @Body() dto: CreateCambioDto,
   ) {
     return this.partidosService.addCambio(id, dto);
+  }
+
+  @Delete(':id/cambios/:cambioId')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Eliminar sustitución (solo partido EN_JUEGO)' })
+  deleteCambio(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('cambioId', ParseIntPipe) cambioId: number,
+  ) {
+    return this.partidosService.deleteCambio(id, cambioId);
   }
 
   @Get(':id')
