@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, TipoPase } from '@prisma/client';
+import { Prisma, PrismaClient, TipoPase } from '@prisma/client';
 import { ValidacionService } from '../core/validacion.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizePage } from '../common/dto/pagination-query.dto';
@@ -21,12 +21,53 @@ export class JugadoresService {
     private readonly validacion: ValidacionService,
   ) {}
 
+  /** Solo dígitos; evita duplicados lógicos (ej. 12.345.678 vs 12345678). */
+  private normalizeDni(dni: string): string {
+    return dni.replace(/[^0-9]/g, '');
+  }
+
+  /**
+   * Comprueba si ya hay un jugador cuyo DNI, normalizado a dígitos, coincide.
+   * Incluye filas antiguas guardadas con puntos u otros separadores.
+   */
+  private async assertDniNoDuplicado(
+    db: PrismaClient | Prisma.TransactionClient,
+    dniNorm: string,
+    exceptJugadorId?: number,
+  ): Promise<void> {
+    if (dniNorm.length < 6) {
+      throw new BadRequestException('DNI inválido');
+    }
+    const rows =
+      exceptJugadorId == null
+        ? await db.$queryRaw<{ id: number }[]>(
+            Prisma.sql`
+              SELECT id FROM "Jugador"
+              WHERE regexp_replace(dni, '[^0-9]', '', 'g') = ${dniNorm}
+              LIMIT 1
+            `,
+          )
+        : await db.$queryRaw<{ id: number }[]>(
+            Prisma.sql`
+              SELECT id FROM "Jugador"
+              WHERE regexp_replace(dni, '[^0-9]', '', 'g') = ${dniNorm}
+                AND id <> ${exceptJugadorId}
+              LIMIT 1
+            `,
+          );
+    if (rows.length > 0) {
+      throw new ConflictException('RN-01: ya existe un jugador con ese DNI');
+    }
+  }
+
   async create(dto: CreateJugadorDto) {
+    const dniNorm = this.normalizeDni(dto.dni);
     try {
       return await this.prisma.$transaction(async (tx) => {
+        await this.assertDniNoDuplicado(tx, dniNorm);
         const j = await tx.jugador.create({
           data: {
-            dni: dto.dni,
+            dni: dniNorm,
             nombre: dto.nombre,
             apellido: dto.apellido,
             telefono: dto.telefono,
@@ -114,11 +155,16 @@ export class JugadoresService {
 
   async update(id: number, dto: UpdateJugadorDto) {
     await this.findOne(id);
+    let dniNorm: string | undefined;
+    if (dto.dni !== undefined) {
+      dniNorm = this.normalizeDni(dto.dni);
+      await this.assertDniNoDuplicado(this.prisma, dniNorm, id);
+    }
     try {
       return await this.prisma.jugador.update({
         where: { id },
         data: {
-          dni: dto.dni,
+          ...(dniNorm !== undefined ? { dni: dniNorm } : {}),
           nombre: dto.nombre,
           apellido: dto.apellido,
           telefono: dto.telefono,
