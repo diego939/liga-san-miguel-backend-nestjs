@@ -31,7 +31,10 @@ export class CreateTorneoDto {
   @IsDateString()
   fechaFin: string;
 
-  @ApiPropertyOptional({ description: 'Máx. foráneos por partido (RN-07)' })
+  @ApiPropertyOptional({
+    //RN-07:
+    description: 'Máx. foráneos por partido',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

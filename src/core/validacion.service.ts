@@ -199,7 +199,8 @@ export class ValidacionService {
     );
     if (!ok) {
       throw new BadRequestException(
-        'RN-03 / RN-05: el jugador no tiene pase activo con destino al club de este equipo en la fecha de referencia.',
+        //RN-03 / RN-05:
+        'El jugador no tiene pase activo con destino al club de este equipo en la fecha de referencia.',
       );
     }
   }
@@ -259,7 +260,8 @@ export class ValidacionService {
     );
     if (!okPase) {
       throw new BadRequestException(
-        'RN-03 / RN-05: el jugador no tiene pase activo con destino al club de este equipo en la fecha del partido.',
+        //RN-03 / RN-05:
+        'El jugador no tiene pase activo con destino al club de este equipo en la fecha del partido.',
       );
     }
 
@@ -272,7 +274,8 @@ export class ValidacionService {
     });
     if (suspendido) {
       throw new BadRequestException(
-        'RN-06 / RN-08: el jugador está suspendido y no puede jugar este partido.',
+        //RN-06 / RN-08:
+        'El jugador está suspendido y no puede jugar este partido.',
       );
     }
 
@@ -291,7 +294,8 @@ export class ValidacionService {
     }
     if (foraneosEnPlanilla > limiteTorneo) {
       throw new BadRequestException(
-        `RN-07: se supera el límite de foráneos por partido (${limiteTorneo}).`,
+        //RN-07:
+        `Se supera el límite de foráneos por partido (${limiteTorneo}).`,
       );
     }
   }
@@ -312,7 +316,8 @@ export class ValidacionService {
     }
     if (foraneosActivosEnEquipo + altasForaneos > limiteTorneo) {
       throw new BadRequestException(
-        `RN-07: el límite de foráneos en la nómina del torneo es ${limiteTorneo}. ` +
+        //RN-07:
+        `El límite de foráneos en la nómina del torneo es ${limiteTorneo}. ` +
           `Hay ${foraneosActivosEnEquipo} foráneo(s) inscripto(s); esta operación sumaría ${altasForaneos}.`,
       );
     }

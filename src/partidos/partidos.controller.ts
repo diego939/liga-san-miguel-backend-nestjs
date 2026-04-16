@@ -80,7 +80,10 @@ export class PartidosResourceController {
   }
 
   @Put(':id/planilla')
-  @ApiOperation({ summary: 'Reemplazar planilla (RN-06, RN-07, RN-12)' })
+  @ApiOperation({
+    //RN-06, RN-07, RN-12:
+    summary: 'Reemplazar planilla',
+  })
   putPlanilla(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ReemplazarPlanillaDto,
@@ -95,7 +98,10 @@ export class PartidosResourceController {
   }
 
   @Post(':id/eventos')
-  @ApiOperation({ summary: 'Registrar gol/tarjeta (RN-08)' })
+  @ApiOperation({
+    //RN-08:
+    summary: 'Registrar gol/tarjeta',
+  })
   addEvento(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateEventoPartidoDto,

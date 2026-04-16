@@ -2,7 +2,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ClubActualResponseDto {
   @ApiPropertyOptional({
-    description: 'Club elegible según pases (RN-03/RN-04)',
+    //RN-03/RN-04:
+    description: 'Club elegible según pases',
   })
   clubId: number | null;
 

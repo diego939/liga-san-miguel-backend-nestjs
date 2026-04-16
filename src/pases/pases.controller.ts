@@ -24,7 +24,10 @@ export class PasesController {
   constructor(private readonly pasesService: PasesService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Registrar pase (RN-02 cierra pase activo previo)' })
+  @ApiOperation({
+    //RN-02:
+    summary: 'Registrar pase (cierra pase activo previo)',
+  })
   create(@Body() dto: CreatePaseDto) {
     return this.pasesService.create(dto);
   }

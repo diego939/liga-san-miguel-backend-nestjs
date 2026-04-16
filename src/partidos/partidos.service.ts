@@ -491,7 +491,8 @@ export class PartidosService {
     });
     if (!row) {
       throw new BadRequestException(
-        'RN-06: el jugador no está en la planilla del partido',
+        //RN-06:
+        'El jugador no está en la planilla del partido',
       );
     }
   }

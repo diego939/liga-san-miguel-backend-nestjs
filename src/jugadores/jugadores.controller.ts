@@ -30,7 +30,10 @@ export class JugadoresController {
   constructor(private readonly jugadoresService: JugadoresService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Crear jugador (RN-01 DNI único)' })
+  @ApiOperation({
+    //RN-01:
+    summary: 'Crear jugador (DNI único)',
+  })
   create(@Body() dto: CreateJugadorDto) {
     return this.jugadoresService.create(dto);
   }
@@ -61,7 +64,8 @@ export class JugadoresController {
 
   @Get(':id/club-actual')
   @ApiOperation({
-    summary: 'Club elegible por pase activo / RN-04 (fecha opcional)',
+    //RN-04:
+    summary: 'Club elegible por pase activo (fecha opcional)',
   })
   @ApiOkResponse({ type: ClubActualResponseDto })
   clubActual(

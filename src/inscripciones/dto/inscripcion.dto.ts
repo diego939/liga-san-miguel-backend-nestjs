@@ -18,7 +18,8 @@ export class CreateInscripcionDto {
   jugadorId: number;
 
   @ApiProperty({
-    description: 'Marca foráneo en la nómina (RN-07 aplica en partido)',
+    //RN-07:
+    description: 'Marca foráneo en la nómina',
   })
   @IsBoolean()
   esForaneo: boolean;
@@ -50,7 +51,10 @@ export class InscripcionBatchLineaDto {
   @IsInt()
   jugadorId: number;
 
-  @ApiProperty({ description: 'Foráneo en la nómina de este torneo (RN-07)' })
+  @ApiProperty({
+    //RN-07:
+    description: 'Foráneo en la nómina de este torneo',
+  })
   @IsBoolean()
   esForaneo: boolean;
 }

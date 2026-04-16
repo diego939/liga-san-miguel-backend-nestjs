@@ -56,7 +56,8 @@ export class JugadoresService {
             `,
           );
     if (rows.length > 0) {
-      throw new ConflictException('RN-01: ya existe un jugador con ese DNI');
+      //RN-01:
+      throw new ConflictException('Ya existe un jugador con ese DNI');
     }
   }
 
@@ -110,7 +111,8 @@ export class JugadoresService {
         e instanceof Prisma.PrismaClientKnownRequestError &&
         e.code === 'P2002'
       ) {
-        throw new ConflictException('RN-01: ya existe un jugador con ese DNI');
+        //RN-01:
+        throw new ConflictException('Ya existe un jugador con ese DNI');
       }
       throw e;
     }
@@ -178,7 +180,8 @@ export class JugadoresService {
         e instanceof Prisma.PrismaClientKnownRequestError &&
         e.code === 'P2002'
       ) {
-        throw new ConflictException('RN-01: ya existe un jugador con ese DNI');
+        //RN-01:
+        throw new ConflictException('Ya existe un jugador con ese DNI');
       }
       throw e;
     }

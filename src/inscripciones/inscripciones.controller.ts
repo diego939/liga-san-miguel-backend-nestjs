@@ -88,7 +88,8 @@ export class CambioEquipoController {
 
   @Post()
   @ApiOperation({
-    summary: 'RN-09 cambio de equipo en el torneo (historial vía fechaFin)',
+    //RN-09:
+    summary: 'Cambio de equipo en el torneo (historial vía fechaFin)',
   })
   cambiar(
     @Param('torneoId', ParseIntPipe) torneoId: number,
