@@ -25,9 +25,12 @@ export class PasesService {
     }
     const fechaInicio = new Date(dto.fechaInicio);
     const fechaFin = dto.fechaFin ? new Date(dto.fechaFin) : null;
-    if (fechaFin && fechaFin <= fechaInicio) {
+    if (Number.isNaN(fechaInicio.getTime()) || (fechaFin && Number.isNaN(fechaFin.getTime()))) {
+      throw new BadRequestException('fechaInicio/fechaFin tienen un formato invalido');
+    }
+    if (fechaFin && fechaFin.getTime() <= fechaInicio.getTime()) {
       throw new BadRequestException(
-        'fechaFin debe ser posterior a fechaInicio',
+        'fechaFin debe ser posterior a fechaInicio, incluyendo la hora',
       );
     }
 
