@@ -35,13 +35,16 @@ export class PasesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // RN-02: un solo pase activo — cerrar los que siguen vigentes al inicio del nuevo
+      // RN-02: un solo pase activo — Ultimo activo.
+      // Un TEMPORAL no cierra pases DEFINITIVO (conviven en el tiempo).
+      const cerrarSolapadosWhere: Prisma.PaseWhereInput = {
+        jugadorId: dto.jugadorId,
+        fechaInicio: { lte: fechaInicio },
+        OR: [{ fechaFin: null }, { fechaFin: { gt: fechaInicio } }],
+        ...(dto.tipo === TipoPase.TEMPORAL ? { tipo: TipoPase.TEMPORAL } : {}),
+      };
       await tx.pase.updateMany({
-        where: {
-          jugadorId: dto.jugadorId,
-          fechaInicio: { lte: fechaInicio },
-          OR: [{ fechaFin: null }, { fechaFin: { gt: fechaInicio } }],
-        },
+        where: cerrarSolapadosWhere,
         data: { fechaFin: fechaInicio },
       });
 
