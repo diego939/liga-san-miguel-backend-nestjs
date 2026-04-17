@@ -252,12 +252,17 @@ export class InscripcionesService {
     return { cerradas };
   }
 
-  async preview(equipoTorneoId: number, jugadorId: number) {
+  async preview(
+    equipoTorneoId: number,
+    jugadorId: number,
+    fechaReferencia?: Date,
+  ) {
+    const at = fechaReferencia ?? new Date();
     try {
       await this.validacion.assertPuedeAltaInscripcion(
         jugadorId,
         equipoTorneoId,
-        new Date(),
+        at,
       );
       return { puede: true as const, motivo: null as string | null };
     } catch (e: unknown) {

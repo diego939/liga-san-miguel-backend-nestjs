@@ -8,6 +8,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
@@ -30,6 +31,18 @@ export class PreviewInscripcionQueryDto {
   @Type(() => Number)
   @IsInt()
   jugadorId: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Instante ISO (p. ej. fecha/hora del partido). Por defecto: ahora. Se valida en el controlador con Date.parse.',
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
+  @IsString()
+  @MaxLength(64)
+  fechaReferencia?: string;
 }
 
 /** Jugadores elegibles para inscribir (pase al club del equipo). */

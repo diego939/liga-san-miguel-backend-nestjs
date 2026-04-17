@@ -206,14 +206,15 @@ export class ValidacionService {
   }
 
   /**
-   * Elegibilidad para jugar (planilla): inscripción activa en el equipo del torneo,
-   * pase activo con destino al club del equipo, no suspendido en el torneo.
+   * Elegibilidad para jugar (planilla): inscripción y pase evaluados en el **instante actual**
+   * (no usa la fecha/hora del partido). Suspensión en el torneo sigue aplicando.
    */
   async assertJugadorPuedeJugarEnPlanilla(
     partidoId: number,
     jugadorId: number,
     equipoTorneoId: number,
   ): Promise<{ esForaneo: boolean }> {
+    const ahora = new Date();
     const partido = await queryPartidoScalarsById(this.prisma, partidoId);
     if (!partido) {
       throw new NotFoundException('Partido no encontrado');
@@ -244,26 +245,20 @@ export class ValidacionService {
       where: {
         jugadorId,
         equipoTorneoId,
-        ...this.whereVigenteEnDiaDe(partido.fecha),
+        ...this.whereVigenteEnDiaDe(ahora),
       },
     });
     if (!inscripcion) {
       throw new BadRequestException(
-        'RN-05 / RN-06: el jugador no está inscripto en este equipo en el torneo para la fecha del partido.',
+        'RN-05 / RN-06: el jugador no está inscripto en este equipo en el torneo a la fecha/hora actual.',
       );
     }
 
-    const okPase = await this.tienePaseActivoHaciaClub(
+    await this.assertPuedeAltaInscripcion(
       jugadorId,
-      equipo.clubId,
-      partido.fecha,
+      equipoTorneoId,
+      ahora,
     );
-    if (!okPase) {
-      throw new BadRequestException(
-        //RN-03 / RN-05:
-        'El jugador no tiene pase activo con destino al club de este equipo en la fecha del partido.',
-      );
-    }
 
     const suspendido = await this.prisma.suspension.findFirst({
       where: {

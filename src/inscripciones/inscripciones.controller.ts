@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -32,7 +33,20 @@ export class InscripcionesByEquipoController {
     @Param('equipoTorneoId', ParseIntPipe) equipoTorneoId: number,
     @Query() q: PreviewInscripcionQueryDto,
   ) {
-    return this.inscripcionesService.preview(equipoTorneoId, q.jugadorId);
+    let fechaRef: Date | undefined;
+    const rawFecha = q.fechaReferencia?.trim();
+    if (rawFecha) {
+      const ms = Date.parse(rawFecha);
+      if (Number.isNaN(ms)) {
+        throw new BadRequestException('fechaReferencia inválida');
+      }
+      fechaRef = new Date(ms);
+    }
+    return this.inscripcionesService.preview(
+      equipoTorneoId,
+      q.jugadorId,
+      fechaRef,
+    );
   }
 
   @Get('candidatos')
