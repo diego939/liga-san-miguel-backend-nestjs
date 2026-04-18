@@ -26,6 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     sub: number;
     email: string;
     rolId: number;
+    rolDescripcion?: string;
   }): Promise<JwtUserPayload> {
     const user = await this.usersService.findById(payload.sub);
     if (!user) {
@@ -35,6 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       sub: user.id,
       email: user.email,
       rolId: user.rolId,
+      rolDescripcion: user.rol.descripcion,
     };
   }
 }

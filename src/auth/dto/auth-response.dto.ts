@@ -9,6 +9,10 @@ export class AuthUserDto {
 
   @ApiProperty()
   rolId: number;
+
+  /** Texto del rol (`Rol.descripcion`, p. ej. ADMIN, OPERADOR). */
+  @ApiProperty()
+  rolDescripcion: string;
 }
 
 export class AuthResponseDto {

@@ -39,6 +39,7 @@ export class AuthController {
       id: full!.id,
       email: full!.email,
       rolId: full!.rolId,
+      rolDescripcion: full!.rol.descripcion,
     };
   }
 }
