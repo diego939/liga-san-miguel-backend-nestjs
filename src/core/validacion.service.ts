@@ -159,19 +159,6 @@ export class ValidacionService {
   }
 
   /**
-   * El jugador puede competir para el club `clubDestinoId` en el instante `at`
-   * (club devuelto por `getClubElegibleId`, no un pase antiguo al mismo club que aún solape el día civil).
-   */
-  async tienePaseActivoHaciaClub(
-    jugadorId: number,
-    clubDestinoId: number,
-    at: Date,
-  ): Promise<boolean> {
-    const elegible = await this.getClubElegibleId(jugadorId, at);
-    return elegible === clubDestinoId;
-  }
-
-  /**
    * RN-03 + RN-05 + RN-12: alta en lista de buena fe — pase activo con destino al **club** del equipo.
    */
   async assertPuedeAltaInscripcion(
@@ -192,15 +179,25 @@ export class ValidacionService {
     if (!jugador) {
       throw new NotFoundException('Jugador no encontrado');
     }
-    const ok = await this.tienePaseActivoHaciaClub(
+    const clubElegibleId = await this.getClubElegibleId(
       jugadorId,
-      equipo.clubId,
       fechaReferencia,
     );
-    if (!ok) {
+    if (clubElegibleId !== equipo.clubId) {
+      if (clubElegibleId === null) {
+        throw new BadRequestException(
+          // RN-03 / RN-05:
+          'El jugador no puede inscribirse en este equipo: en la fecha de referencia no tiene un club elegible según su historial de pases.',
+        );
+      }
+      const clubElegible = await this.prisma.club.findUnique({
+        where: { id: clubElegibleId },
+        select: { nombre: true },
+      });
+      const nombreClub = clubElegible?.nombre ?? 'otro club';
       throw new BadRequestException(
-        //RN-03 / RN-05:
-        'El jugador no tiene pase activo con destino al club de este equipo en la fecha de referencia.',
+        // RN-03 / RN-05:
+        `El jugador no puede inscribirse en este equipo: actualmente solo puede jugar para el club «${nombreClub}».`,
       );
     }
   }
