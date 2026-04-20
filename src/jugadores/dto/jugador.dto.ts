@@ -35,6 +35,11 @@ export class CreateJugadorDto {
   @IsDateString()
   fechaNacimiento: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  nacionalidad?: string | null;
+
   @ApiPropertyOptional({
     description:
       'Si se envía, se registra un pase inicial DEFINITIVO (origen null → destino este club).',
@@ -71,6 +76,15 @@ export class UpdateJugadorDto {
   @IsOptional()
   @IsDateString()
   fechaNacimiento?: string;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Nacionalidad del jugador. En PATCH, enviar null o string vacío para limpiar el dato.',
+  })
+  @IsOptional()
+  @IsString()
+  nacionalidad?: string | null;
 }
 
 export class JugadorQueryDto extends PaginationQueryDto {

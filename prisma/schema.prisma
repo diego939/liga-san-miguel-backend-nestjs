@@ -61,6 +61,7 @@ model Jugador {
   apellido        String
   telefono        String?
   fechaNacimiento DateTime
+  nacionalidad    String?
   createdAt       DateTime @default(now())
 
   pases                      Pase[]

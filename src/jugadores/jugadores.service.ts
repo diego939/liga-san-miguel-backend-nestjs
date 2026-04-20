@@ -26,6 +26,13 @@ export class JugadoresService {
     return dni.replace(/[^0-9]/g, '');
   }
 
+  /** Normaliza strings opcionales para persistencia (vacío -> null). */
+  private normalizeOptionalText(value?: string | null): string | null {
+    if (value == null) return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
   /**
    * Comprueba si ya hay un jugador cuyo DNI, normalizado a dígitos, coincide.
    * Incluye filas antiguas guardadas con puntos u otros separadores.
@@ -73,6 +80,7 @@ export class JugadoresService {
             apellido: dto.apellido,
             telefono: dto.telefono,
             fechaNacimiento: new Date(dto.fechaNacimiento),
+            nacionalidad: this.normalizeOptionalText(dto.nacionalidad),
           },
         });
 
@@ -173,6 +181,9 @@ export class JugadoresService {
           fechaNacimiento: dto.fechaNacimiento
             ? new Date(dto.fechaNacimiento)
             : undefined,
+          ...(dto.nacionalidad !== undefined
+            ? { nacionalidad: this.normalizeOptionalText(dto.nacionalidad) }
+            : {}),
         },
       });
     } catch (e) {
