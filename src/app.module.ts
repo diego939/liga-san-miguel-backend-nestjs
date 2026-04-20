@@ -17,6 +17,7 @@ import { RolesModule } from './roles/roles.module';
 import { SuspensionesModule } from './suspensiones/suspensiones.module';
 import { TorneosModule } from './torneos/torneos.module';
 import { UsersModule } from './users/users.module';
+import { DbKeepAliveService } from './keepalive/db-keepalive.service';
 
 @Module({
   imports: [
@@ -37,6 +38,9 @@ import { UsersModule } from './users/users.module';
     EstadisticasModule,
   ],
   controllers: [AppController],
-  providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    DbKeepAliveService,
+  ],
 })
 export class AppModule {}
