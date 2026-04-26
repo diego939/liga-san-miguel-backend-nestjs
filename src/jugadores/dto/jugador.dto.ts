@@ -6,7 +6,10 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
+  Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
@@ -31,9 +34,20 @@ export class CreateJugadorDto {
   @IsString()
   telefono?: string;
 
-  @ApiProperty({ example: '2000-01-15' })
+  @ApiProperty({ example: 2000, description: 'Año de nacimiento (obligatorio).' })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1900)
+  @Max(2100)
+  anioNacimiento: number;
+
+  @ApiPropertyOptional({
+    example: '2000-01-15',
+    description: 'Fecha completa opcional si se conoce.',
+  })
+  @IsOptional()
   @IsDateString()
-  fechaNacimiento: string;
+  fechaNacimiento?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -72,10 +86,23 @@ export class UpdateJugadorDto {
   @IsString()
   telefono?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Año de nacimiento.' })
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1900)
+  @Max(2200)
+  anioNacimiento?: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Fecha de nacimiento. En PATCH, omitir para no cambiar; null o string vacío para borrar.',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null && v !== '')
   @IsDateString()
-  fechaNacimiento?: string;
+  fechaNacimiento?: string | null;
 
   @ApiPropertyOptional({
     nullable: true,
@@ -99,11 +126,30 @@ export class JugadorQueryDto extends PaginationQueryDto {
   dni?: string;
 
   @ApiPropertyOptional({
-    enum: ['apellido', 'nombre', 'dni', 'fechaNacimiento', 'createdAt'],
+    enum: [
+      'apellido',
+      'nombre',
+      'dni',
+      'anioNacimiento',
+      'fechaNacimiento',
+      'createdAt',
+    ],
     default: 'apellido',
   })
   @IsOptional()
-  @IsIn(['apellido', 'nombre', 'dni', 'fechaNacimiento', 'createdAt'])
-  sortBy?: 'apellido' | 'nombre' | 'dni' | 'fechaNacimiento' | 'createdAt' =
-    'apellido';
+  @IsIn([
+    'apellido',
+    'nombre',
+    'dni',
+    'anioNacimiento',
+    'fechaNacimiento',
+    'createdAt',
+  ])
+  sortBy?:
+    | 'apellido'
+    | 'nombre'
+    | 'dni'
+    | 'anioNacimiento'
+    | 'fechaNacimiento'
+    | 'createdAt' = 'apellido';
 }

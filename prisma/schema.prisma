@@ -60,7 +60,8 @@ model Jugador {
   nombre          String
   apellido        String
   telefono        String?
-  fechaNacimiento DateTime
+  fechaNacimiento DateTime?
+  anioNacimiento  Int? 
   nacionalidad    String?
   createdAt       DateTime @default(now())
 

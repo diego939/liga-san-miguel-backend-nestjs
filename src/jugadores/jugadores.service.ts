@@ -79,7 +79,12 @@ export class JugadoresService {
             nombre: dto.nombre,
             apellido: dto.apellido,
             telefono: dto.telefono,
-            fechaNacimiento: new Date(dto.fechaNacimiento),
+            anioNacimiento: dto.anioNacimiento,
+            fechaNacimiento:
+              dto.fechaNacimiento != null &&
+              String(dto.fechaNacimiento).trim() !== ''
+                ? new Date(dto.fechaNacimiento)
+                : null,
             nacionalidad: this.normalizeOptionalText(dto.nacionalidad),
           },
         });
@@ -178,9 +183,19 @@ export class JugadoresService {
           nombre: dto.nombre,
           apellido: dto.apellido,
           telefono: dto.telefono,
-          fechaNacimiento: dto.fechaNacimiento
-            ? new Date(dto.fechaNacimiento)
-            : undefined,
+          ...(dto.anioNacimiento !== undefined
+            ? { anioNacimiento: dto.anioNacimiento }
+            : {}),
+          ...(dto.fechaNacimiento !== undefined
+            ? {
+                fechaNacimiento:
+                  dto.fechaNacimiento === null ||
+                  (typeof dto.fechaNacimiento === 'string' &&
+                    dto.fechaNacimiento.trim() === '')
+                    ? null
+                    : new Date(dto.fechaNacimiento),
+              }
+            : {}),
           ...(dto.nacionalidad !== undefined
             ? { nacionalidad: this.normalizeOptionalText(dto.nacionalidad) }
             : {}),
