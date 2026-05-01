@@ -19,4 +19,13 @@ export class EstadisticasController {
   goleadores(@Param('torneoId', ParseIntPipe) torneoId: number) {
     return this.estadisticasService.goleadores(torneoId);
   }
+
+  @Get('tarjetas')
+  @ApiOperation({
+    summary:
+      'Tarjetas amarillas y rojas acumuladas por jugador en el torneo (todos los partidos)',
+  })
+  tarjetas(@Param('torneoId', ParseIntPipe) torneoId: number) {
+    return this.estadisticasService.tarjetasPorJugador(torneoId);
+  }
 }

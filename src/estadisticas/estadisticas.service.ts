@@ -147,4 +147,104 @@ export class EstadisticasService {
       }))
       .sort((a, b) => b.goles - a.goles);
   }
+
+  /**
+   * Amarillas y rojas acumuladas por jugador en todos los partidos del torneo
+   * (mismo criterio de alcance que goleadores: eventos ligados al torneo).
+   */
+  async tarjetasPorJugador(torneoId: number) {
+    const torneo = await this.prisma.torneo.findUnique({
+      where: { id: torneoId },
+    });
+    if (!torneo) {
+      throw new NotFoundException('Torneo no encontrado');
+    }
+
+    const rows = await this.prisma.eventoPartido.groupBy({
+      by: ['jugadorId', 'tipo'],
+      where: {
+        tipo: { in: [TipoEvento.AMARILLA, TipoEvento.ROJA] },
+        partido: { torneoId },
+      },
+      _count: { id: true },
+    });
+
+    if (rows.length === 0) {
+      return {
+        totalAmarillas: 0,
+        totalRojas: 0,
+        jugadoresAmonestados: 0,
+        jugadores: [],
+      };
+    }
+
+    const agg = new Map<number, { amarillas: number; rojas: number }>();
+    let totalAmarillas = 0;
+    let totalRojas = 0;
+
+    for (const r of rows) {
+      let cur = agg.get(r.jugadorId);
+      if (!cur) {
+        cur = { amarillas: 0, rojas: 0 };
+        agg.set(r.jugadorId, cur);
+      }
+      if (r.tipo === TipoEvento.AMARILLA) {
+        cur.amarillas = r._count.id;
+        totalAmarillas += r._count.id;
+      } else if (r.tipo === TipoEvento.ROJA) {
+        cur.rojas = r._count.id;
+        totalRojas += r._count.id;
+      }
+    }
+
+    const jugadorIds = [...agg.keys()];
+    const jugadores = await this.prisma.jugador.findMany({
+      where: { id: { in: jugadorIds } },
+    });
+    const byId = new Map(jugadores.map((j) => [j.id, j]));
+
+    const inscripciones = await this.prisma.inscripcion.findMany({
+      where: {
+        jugadorId: { in: jugadorIds },
+        fechaFin: null,
+        equipoTorneo: { torneoId },
+      },
+      include: { equipoTorneo: { include: { club: true } } },
+    });
+    const clubByJugador = new Map<number, string>();
+    for (const ins of inscripciones) {
+      if (!clubByJugador.has(ins.jugadorId)) {
+        clubByJugador.set(ins.jugadorId, ins.equipoTorneo.club.nombre);
+      }
+    }
+
+    const jugadoresOut = [...agg.entries()]
+      .map(([jugadorId, c]) => ({
+        jugadorId,
+        amarillas: c.amarillas,
+        rojas: c.rojas,
+        jugador: byId.get(jugadorId) ?? null,
+        clubNombre: clubByJugador.get(jugadorId) ?? null,
+      }))
+      .sort((a, b) => {
+        const ta = a.amarillas + a.rojas;
+        const tb = b.amarillas + b.rojas;
+        if (tb !== ta) return tb - ta;
+        if (b.rojas !== a.rojas) return b.rojas - a.rojas;
+        const na = a.jugador
+          ? `${a.jugador.apellido}, ${a.jugador.nombre}`
+          : `#${a.jugadorId}`;
+        const nb = b.jugador
+          ? `${b.jugador.apellido}, ${b.jugador.nombre}`
+          : `#${b.jugadorId}`;
+        return na.localeCompare(nb, 'es');
+      });
+
+    return {
+      totalAmarillas,
+      totalRojas,
+      jugadoresAmonestados: jugadoresOut.length,
+      jugadores: jugadoresOut,
+    };
+  }
 }

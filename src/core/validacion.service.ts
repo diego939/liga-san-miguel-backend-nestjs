@@ -27,6 +27,34 @@ export class ValidacionService {
     );
   }
 
+  private activeSuspensionWhere(at: Date): Prisma.SuspensionWhereInput {
+    return {
+      OR: [
+        { partidosRestantes: { gt: 0 } },
+        { fechaHasta: { gte: at } },
+      ],
+    };
+  }
+
+  /** Texto legible para el mensaje de error cuando hay suspensión activa. */
+  private mensajeDetalleSuspensionActiva(s: {
+    motivo: string;
+    partidosRestantes: number | null;
+    fechaHasta: Date | null;
+  }): string {
+    const partes: string[] = [`Motivo: ${s.motivo}.`];
+    if (s.partidosRestantes != null && s.partidosRestantes > 0) {
+      partes.push(`Partidos restantes de suspensión: ${s.partidosRestantes}.`);
+    }
+    if (s.fechaHasta != null) {
+      const hasta = DateTime.fromJSDate(s.fechaHasta)
+        .setZone(this.appTimeZone)
+        .toFormat('dd/MM/yyyy HH:mm');
+      partes.push(`Suspendido hasta: ${hasta}.`);
+    }
+    return partes.join(' ');
+  }
+
   /**
    * Inicio y fin del día civil en `appTimeZone` que contiene el instante `fecha`
    * (para solapes de inscripción / pase con la fecha del partido).
@@ -261,13 +289,19 @@ export class ValidacionService {
       where: {
         jugadorId,
         torneoId: partido.torneoId,
-        partidosRestantes: { gt: 0 },
+        ...this.activeSuspensionWhere(ahora),
+      },
+      select: {
+        motivo: true,
+        partidosRestantes: true,
+        fechaHasta: true,
       },
     });
     if (suspendido) {
       throw new BadRequestException(
-        //RN-06 / RN-08:
-        'El jugador está suspendido y no puede jugar este partido.',
+        // RN-06 / RN-08:
+        'El jugador está suspendido y no puede jugar este partido. ' +
+          this.mensajeDetalleSuspensionActiva(suspendido),
       );
     }
 
@@ -320,13 +354,15 @@ export class ValidacionService {
     tx: Prisma.TransactionClient,
     jugadorId: number,
     torneoId: number,
+    suspension: { partidosRestantes?: number; fechaHasta?: Date },
   ) {
     await tx.suspension.create({
       data: {
         jugadorId,
         torneoId,
         motivo: 'Tarjeta roja',
-        partidosRestantes: 1,
+        partidosRestantes: suspension.partidosRestantes ?? null,
+        fechaHasta: suspension.fechaHasta ?? null,
       },
     });
   }
@@ -351,6 +387,7 @@ export class ValidacionService {
           torneoId,
           motivo: 'Acumulación de 5 tarjetas amarillas en el torneo',
           partidosRestantes: 1,
+          fechaHasta: null,
         },
       });
     }

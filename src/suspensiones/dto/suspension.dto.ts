@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CreateSuspensionDto {
   @ApiProperty()
@@ -16,11 +23,20 @@ export class CreateSuspensionDto {
   @MinLength(2)
   motivo: string;
 
-  @ApiProperty({ default: 1 })
+  @ApiPropertyOptional({ default: 1, nullable: true })
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(0)
-  partidosRestantes: number;
+  @Min(1)
+  partidosRestantes?: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Fecha límite (inclusive) hasta la que no puede jugar',
+  })
+  @IsOptional()
+  @IsDateString()
+  fechaHasta?: string;
 }
 
 export class UpdateSuspensionDto {
@@ -33,6 +49,14 @@ export class UpdateSuspensionDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(0)
+  @Min(1)
   partidosRestantes?: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Fecha límite (inclusive) hasta la que no puede jugar',
+  })
+  @IsOptional()
+  @IsDateString()
+  fechaHasta?: string;
 }

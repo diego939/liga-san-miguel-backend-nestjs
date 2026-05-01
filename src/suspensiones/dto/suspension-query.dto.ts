@@ -17,7 +17,8 @@ export class SuspensionQueryDto extends PaginationQueryDto {
   jugadorId?: number;
 
   @ApiPropertyOptional({
-    description: 'Solo suspensiones con partidos por cumplir',
+    description:
+      'Solo suspensiones activas por partidos pendientes o por fecha de bloqueo vigente',
   })
   @IsOptional()
   @Transform(
@@ -26,8 +27,11 @@ export class SuspensionQueryDto extends PaginationQueryDto {
   @IsBoolean()
   activas?: boolean;
 
-  @ApiPropertyOptional({ enum: ['id', 'partidosRestantes'], default: 'id' })
+  @ApiPropertyOptional({
+    enum: ['id', 'partidosRestantes', 'fechaHasta'],
+    default: 'id',
+  })
   @IsOptional()
-  @IsIn(['id', 'partidosRestantes'])
-  sortBy?: 'id' | 'partidosRestantes' = 'id';
+  @IsIn(['id', 'partidosRestantes', 'fechaHasta'])
+  sortBy?: 'id' | 'partidosRestantes' | 'fechaHasta' = 'id';
 }

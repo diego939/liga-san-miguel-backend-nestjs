@@ -64,6 +64,46 @@ export class PartidosService {
     private readonly validacion: ValidacionService,
   ) {}
 
+  private parseFechaHasta(fechaRaw: string): Date {
+    const normalized =
+      /^\d{4}-\d{2}-\d{2}$/.test(fechaRaw)
+        ? `${fechaRaw}T23:59:59.999`
+        : fechaRaw;
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('fechaHasta inválida para suspensión.');
+    }
+    return parsed;
+  }
+
+  private parseSuspensionRojaConfig(dto: CreateEventoPartidoDto): {
+    partidosRestantes?: number;
+    fechaHasta?: Date;
+  } {
+    if (dto.tipo !== TipoEvento.ROJA) {
+      return {};
+    }
+    const partidosRestantes = dto.suspensionRoja?.partidosRestantes;
+    const fechaHastaRaw = dto.suspensionRoja?.fechaHasta;
+    const hasPartidos = partidosRestantes !== undefined;
+    const hasFecha = fechaHastaRaw !== undefined;
+    if (hasPartidos && hasFecha) {
+      throw new BadRequestException(
+        'Para ROJA definí suspensión por partidosRestantes o por fechaHasta, no ambos.',
+      );
+    }
+    if (!hasPartidos && !hasFecha) {
+      throw new BadRequestException(
+        'Para ROJA debés indicar partidosRestantes o fechaHasta.',
+      );
+    }
+    if (hasPartidos) {
+      return { partidosRestantes };
+    }
+    const fechaHasta = this.parseFechaHasta(fechaHastaRaw!);
+    return { fechaHasta };
+  }
+
   /**
    * Persiste `golesLocal` / `golesVisitante` a partir de eventos GOL y GOL_EN_CONTRA
    * y la planilla actual (equipo de cada jugador). Si no hay eventos de gol, no modifica
@@ -506,6 +546,7 @@ export class PartidosService {
     }
     await this.assertJugadorEnPlanilla(partidoId, dto.jugadorId);
 
+    const suspensionRoja = this.parseSuspensionRojaConfig(dto);
     const ev = await this.prisma.$transaction(async (tx) => {
       const created = await tx.eventoPartido.create({
         data: {
@@ -522,6 +563,7 @@ export class PartidosService {
           tx,
           dto.jugadorId,
           partido.torneoId,
+          suspensionRoja,
         );
       }
       if (dto.tipo === TipoEvento.AMARILLA) {

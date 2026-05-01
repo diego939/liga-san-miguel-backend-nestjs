@@ -133,6 +133,23 @@ export class ReemplazarPlanillaDto {
   observaciones?: string | null;
 }
 
+export class ConfigSuspensionEventoRojaDto {
+  @ApiPropertyOptional({ nullable: true, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  partidosRestantes?: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Fecha límite (inclusive) hasta la que no puede jugar',
+  })
+  @IsOptional()
+  @IsDateString()
+  fechaHasta?: string;
+}
+
 export class CreateEventoPartidoDto {
   @ApiProperty()
   @IsInt()
@@ -152,6 +169,16 @@ export class CreateEventoPartidoDto {
   @IsString()
   @MaxLength(500)
   notas?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Configuración de suspensión para ROJA (usar partidosRestantes o fechaHasta)',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConfigSuspensionEventoRojaDto)
+  suspensionRoja?: ConfigSuspensionEventoRojaDto;
 }
 
 export class CreateCambioDto {

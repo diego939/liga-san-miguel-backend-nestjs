@@ -267,7 +267,8 @@ model Suspension {
   jugadorId         Int
   torneoId          Int
   motivo            String
-  partidosRestantes Int
+  partidosRestantes Int?
+  fechaHasta        DateTime?
 
   jugador Jugador @relation(fields: [jugadorId], references: [id])
   torneo  Torneo  @relation(fields: [torneoId], references: [id])
