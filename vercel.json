@@ -3,7 +3,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 60,
-      "includeFiles": "{dist/**,node_modules/.prisma/**,prisma/schema.prisma}"
+      "includeFiles": "{dist/**,node_modules/.prisma/**,prisma/schema.prisma,node_modules/swagger-ui-dist/**}"
     }
   },
   "rewrites": [
