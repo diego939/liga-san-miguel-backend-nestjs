@@ -8,15 +8,7 @@
   },
   "rewrites": [
     {
-      "source": "/docs",
-      "destination": "/docs.html"
-    },
-    {
-      "source": "/api",
-      "destination": "/api"
-    },
-    {
-      "source": "/api/(.*)",
+      "source": "/(.*)",
       "destination": "/api"
     }
   ]

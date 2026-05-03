@@ -23,6 +23,3 @@ Thumbs.db
 
 # tests
 /coverage
-
-# generado en build (Vercel/CI)
-/public/openapi.json

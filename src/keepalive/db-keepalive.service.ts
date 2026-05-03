@@ -13,9 +13,9 @@ export class DbKeepAliveService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly prisma: PrismaService) {}
 
   onModuleInit(): void {
-    if (process.env.VERCEL === '1' || process.env.OPENAPI_EXPORT === '1') {
+    if (process.env.VERCEL === '1') {
       this.logger.log(
-        'Keepalive desactivado (serverless o export OpenAPI; sin ping ni intervalo)',
+        'Keepalive desactivado en Vercel (serverless; sin ping ni intervalo)',
       );
       return;
     }
