@@ -13,14 +13,14 @@ export class DbKeepAliveService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly prisma: PrismaService) {}
 
   onModuleInit(): void {
-    void this.ping('startup');
-
     if (process.env.VERCEL === '1') {
       this.logger.log(
-        'Keepalive por intervalo desactivado en Vercel (serverless)',
+        'Keepalive desactivado en Vercel (serverless; sin ping ni intervalo)',
       );
       return;
     }
+
+    void this.ping('startup');
 
     const intervalMs = KEEPALIVE_INTERVAL_MINUTES * 60_000;
     this.timer = setInterval(() => {

@@ -7,6 +7,11 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   async onModuleInit(): Promise<void> {
+    // En Vercel no bloquear el cold start: si la BD tarda o la red cuelga,
+    // await $connect() impide responder rutas ligeras (/docs) hasta timeout.
+    if (process.env.VERCEL === '1') {
+      return;
+    }
     await this.$connect();
   }
 
