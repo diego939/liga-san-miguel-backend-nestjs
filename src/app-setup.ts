@@ -1,21 +1,13 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import {
+  DocumentBuilder,
+  OpenAPIObject,
+  SwaggerModule,
+} from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 
-export function configureApp(app: INestApplication): void {
-  const httpAdapter = app.getHttpAdapter();
-  if (httpAdapter.getType() === 'express') {
-    const expressInstance = httpAdapter.getInstance() as {
-      set: (key: string, value: unknown) => void;
-      get: (path: string, handler: (req: Request, res: Response) => void) => void;
-    };
-    expressInstance.set('trust proxy', 1);
-    // Sin barra final: los assets relativos ./docs/* deben resolver a /docs/*, no /docs/docs/*
-    expressInstance.get('/docs/', (_req: Request, res: Response) =>
-      res.redirect(301, '/docs'),
-    );
-  }
-
+/** Configuración compartida: CORS, prefijo `api`, pipes (necesaria para generar OpenAPI fiel al runtime). */
+export function applyApiGlobals(app: INestApplication): void {
   app.enableCors({
     origin: process.env.CORS_ORIGIN
       ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
@@ -31,7 +23,9 @@ export function configureApp(app: INestApplication): void {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+}
 
+export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
     .setTitle('Liga San Miguel API')
     .setDescription(
@@ -43,6 +37,31 @@ export function configureApp(app: INestApplication): void {
       'access-token',
     )
     .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  return SwaggerModule.createDocument(app, config);
+}
+
+export function configureApp(app: INestApplication): void {
+  const isVercel = process.env.VERCEL === '1';
+
+  const httpAdapter = app.getHttpAdapter();
+  if (httpAdapter.getType() === 'express') {
+    const expressInstance = httpAdapter.getInstance() as {
+      set: (key: string, value: unknown) => void;
+      get: (path: string, handler: (req: Request, res: Response) => void) => void;
+    };
+    expressInstance.set('trust proxy', 1);
+    if (!isVercel) {
+      expressInstance.get('/docs/', (_req: Request, res: Response) =>
+        res.redirect(301, '/docs'),
+      );
+    }
+  }
+
+  applyApiGlobals(app);
+
+  // En Vercel la UI Swagger es estática (public/); no generar documento ni rutas /docs en la lambda (ahorra cold start).
+  if (!isVercel) {
+    const document = buildOpenApiDocument(app);
+    SwaggerModule.setup('docs', app, document);
+  }
 }
