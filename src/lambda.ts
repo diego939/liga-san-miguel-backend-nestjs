@@ -3,13 +3,18 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
-import serverless from 'serverless-http';
 import { AppModule } from './app.module';
 import { configureApp } from './app-setup';
 
-let cachedServer: ReturnType<typeof serverless> | undefined;
+/**
+ * Vercel invoca el handler con `IncomingMessage` / `ServerResponse` de Node.
+ * `serverless-http` (proveedor AWS por defecto) espera un evento API Gateway;
+ * pasarle `req`/`res` hace que el ciclo de la petición no cierre y la función
+ * llegue a FUNCTION_INVOCATION_TIMEOUT (~60s). Aquí se usa Express directamente.
+ */
+let cachedApp: express.Express | undefined;
 
-async function bootstrapServer(): Promise<ReturnType<typeof serverless>> {
+async function bootstrapServer(): Promise<express.Express> {
   const expressApp = express();
   const app = await NestFactory.create(
     AppModule,
@@ -17,15 +22,15 @@ async function bootstrapServer(): Promise<ReturnType<typeof serverless>> {
   );
   configureApp(app);
   await app.init();
-  return serverless(expressApp);
+  return expressApp;
 }
 
 export const handler = async (
   req: express.Request,
   res: express.Response,
 ): Promise<void> => {
-  if (!cachedServer) {
-    cachedServer = await bootstrapServer();
+  if (!cachedApp) {
+    cachedApp = await bootstrapServer();
   }
-  await cachedServer(req, res);
+  cachedApp(req, res);
 };
