@@ -1,7 +1,21 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 
 export function configureApp(app: INestApplication): void {
+  const httpAdapter = app.getHttpAdapter();
+  if (httpAdapter.getType() === 'express') {
+    const expressInstance = httpAdapter.getInstance() as {
+      set: (key: string, value: unknown) => void;
+      get: (path: string, handler: (req: Request, res: Response) => void) => void;
+    };
+    expressInstance.set('trust proxy', 1);
+    // Sin barra final: los assets relativos ./docs/* deben resolver a /docs/*, no /docs/docs/*
+    expressInstance.get('/docs/', (_req: Request, res: Response) =>
+      res.redirect(301, '/docs'),
+    );
+  }
+
   app.enableCors({
     origin: process.env.CORS_ORIGIN
       ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
