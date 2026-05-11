@@ -179,6 +179,16 @@ export class CreateEventoPartidoDto {
   @ValidateNested()
   @Type(() => ConfigSuspensionEventoRojaDto)
   suspensionRoja?: ConfigSuspensionEventoRojaDto;
+
+  @ApiPropertyOptional({
+    description:
+      'Obligatorio cuando esta amarilla completa 5, 10, 15… amarillas en el torneo: definir suspensión por partidosRestantes o fechaHasta',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConfigSuspensionEventoRojaDto)
+  suspensionAcumulacionAmarillas?: ConfigSuspensionEventoRojaDto;
 }
 
 export class CreateCambioDto {

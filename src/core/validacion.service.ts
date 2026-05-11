@@ -367,11 +367,12 @@ export class ValidacionService {
     });
   }
 
-  /** Tras acumular 5 amarillas en el torneo (RN-08). */
+  /** Tras acumular 5, 10, 15… amarillas en el torneo (RN-08). */
   async crearSuspensionPorAmarillasSiCorresponde(
     tx: Prisma.TransactionClient,
     jugadorId: number,
     torneoId: number,
+    suspension?: { partidosRestantes?: number; fechaHasta?: Date },
   ) {
     const totalAmarillas = await tx.eventoPartido.count({
       where: {
@@ -380,17 +381,24 @@ export class ValidacionService {
         partido: { torneoId },
       },
     });
-    if (totalAmarillas > 0 && totalAmarillas % 5 === 0) {
-      await tx.suspension.create({
-        data: {
-          jugadorId,
-          torneoId,
-          motivo: 'Acumulación de 5 tarjetas amarillas en el torneo',
-          partidosRestantes: 1,
-          fechaHasta: null,
-        },
-      });
+    if (totalAmarillas <= 0 || totalAmarillas % 5 !== 0) {
+      return;
     }
+    if (!suspension) {
+      throw new BadRequestException(
+        'Esta amarilla completa un ciclo de acumulación (5, 10, 15…). ' +
+          'Enviá suspensionAcumulacionAmarillas con partidosRestantes o fechaHasta.',
+      );
+    }
+    await tx.suspension.create({
+      data: {
+        jugadorId,
+        torneoId,
+        motivo: 'Acumulación de 5 tarjetas amarillas en el torneo',
+        partidosRestantes: suspension.partidosRestantes ?? null,
+        fechaHasta: suspension.fechaHasta ?? null,
+      },
+    });
   }
 
   /**

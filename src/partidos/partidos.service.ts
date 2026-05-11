@@ -76,25 +76,22 @@ export class PartidosService {
     return parsed;
   }
 
-  private parseSuspensionRojaConfig(dto: CreateEventoPartidoDto): {
-    partidosRestantes?: number;
-    fechaHasta?: Date;
-  } {
-    if (dto.tipo !== TipoEvento.ROJA) {
-      return {};
-    }
-    const partidosRestantes = dto.suspensionRoja?.partidosRestantes;
-    const fechaHastaRaw = dto.suspensionRoja?.fechaHasta;
+  private parseSuspensionEventoPayload(
+    payload: { partidosRestantes?: number; fechaHasta?: string } | undefined,
+    contexto: string,
+  ): { partidosRestantes?: number; fechaHasta?: Date } {
+    const partidosRestantes = payload?.partidosRestantes;
+    const fechaHastaRaw = payload?.fechaHasta;
     const hasPartidos = partidosRestantes !== undefined;
     const hasFecha = fechaHastaRaw !== undefined;
     if (hasPartidos && hasFecha) {
       throw new BadRequestException(
-        'Para ROJA definí suspensión por partidosRestantes o por fechaHasta, no ambos.',
+        `${contexto}: definí la suspensión por partidosRestantes o por fechaHasta, no ambos.`,
       );
     }
     if (!hasPartidos && !hasFecha) {
       throw new BadRequestException(
-        'Para ROJA debés indicar partidosRestantes o fechaHasta.',
+        `${contexto}: debés indicar partidosRestantes o fechaHasta.`,
       );
     }
     if (hasPartidos) {
@@ -102,6 +99,28 @@ export class PartidosService {
     }
     const fechaHasta = this.parseFechaHasta(fechaHastaRaw!);
     return { fechaHasta };
+  }
+
+  private parseSuspensionRojaConfig(dto: CreateEventoPartidoDto): {
+    partidosRestantes?: number;
+    fechaHasta?: Date;
+  } {
+    if (dto.tipo !== TipoEvento.ROJA) {
+      return {};
+    }
+    return this.parseSuspensionEventoPayload(
+      dto.suspensionRoja,
+      'Para tarjeta roja',
+    );
+  }
+
+  private parseSuspensionAcumulacionAmarillasConfig(
+    dto: CreateEventoPartidoDto,
+  ): { partidosRestantes?: number; fechaHasta?: Date } {
+    return this.parseSuspensionEventoPayload(
+      dto.suspensionAcumulacionAmarillas,
+      'Para suspensión por acumulación de 5 amarillas',
+    );
   }
 
   /**
@@ -548,6 +567,19 @@ export class PartidosService {
 
     const suspensionRoja = this.parseSuspensionRojaConfig(dto);
     const ev = await this.prisma.$transaction(async (tx) => {
+      let suspensionAcum5: { partidosRestantes?: number; fechaHasta?: Date } | undefined;
+      if (dto.tipo === TipoEvento.AMARILLA) {
+        const amarillasPre = await tx.eventoPartido.count({
+          where: {
+            tipo: TipoEvento.AMARILLA,
+            jugadorId: dto.jugadorId,
+            partido: { torneoId: partido.torneoId },
+          },
+        });
+        if ((amarillasPre + 1) % 5 === 0) {
+          suspensionAcum5 = this.parseSuspensionAcumulacionAmarillasConfig(dto);
+        }
+      }
       const created = await tx.eventoPartido.create({
         data: {
           partidoId,
@@ -571,6 +603,7 @@ export class PartidosService {
           tx,
           dto.jugadorId,
           partido.torneoId,
+          suspensionAcum5,
         );
       }
       return created;

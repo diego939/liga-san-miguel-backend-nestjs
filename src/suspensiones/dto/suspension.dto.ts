@@ -7,6 +7,7 @@ import {
   IsString,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateSuspensionDto {
@@ -45,11 +46,14 @@ export class UpdateSuspensionDto {
   @IsString()
   motivo?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description:
+      'Partidos restantes (≥1) o 0 para revocar vigencia (sin partidos ni fecha)',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1)
+  @Min(0)
   partidosRestantes?: number;
 
   @ApiPropertyOptional({
@@ -57,6 +61,7 @@ export class UpdateSuspensionDto {
     description: 'Fecha límite (inclusive) hasta la que no puede jugar',
   })
   @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
   @IsDateString()
-  fechaHasta?: string;
+  fechaHasta?: string | null;
 }

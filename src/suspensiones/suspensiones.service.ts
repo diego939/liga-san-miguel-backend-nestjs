@@ -152,7 +152,15 @@ export class SuspensionesService {
 
     const hasPartidos = dto.partidosRestantes !== undefined;
     const hasFecha = dto.fechaHasta !== undefined;
-    if (hasPartidos && hasFecha) {
+    const fechaValor = hasFecha ? dto.fechaHasta : undefined;
+    const revocaVigencia = hasPartidos && dto.partidosRestantes === 0;
+
+    if (revocaVigencia && hasFecha && fechaValor !== null) {
+      throw new BadRequestException(
+        'Para revocar la vigencia enviá solo partidosRestantes: 0 (o también fechaHasta: null).',
+      );
+    }
+    if (!revocaVigencia && hasPartidos && hasFecha && fechaValor != null) {
       throw new BadRequestException(
         'La suspensión debe definirse por partidosRestantes o por fechaHasta, no ambos.',
       );
@@ -162,11 +170,14 @@ export class SuspensionesService {
     if (dto.motivo !== undefined) {
       data.motivo = dto.motivo;
     }
-    if (hasPartidos) {
+    if (revocaVigencia) {
+      data.partidosRestantes = 0;
+      data.fechaHasta = null;
+    } else if (hasPartidos && dto.partidosRestantes! > 0) {
       data.partidosRestantes = dto.partidosRestantes!;
       data.fechaHasta = null;
-    } else if (hasFecha) {
-      data.fechaHasta = this.parseFechaHasta(dto.fechaHasta!);
+    } else if (hasFecha && fechaValor != null && fechaValor !== '') {
+      data.fechaHasta = this.parseFechaHasta(fechaValor);
       data.partidosRestantes = null;
     }
 
